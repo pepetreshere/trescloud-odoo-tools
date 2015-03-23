@@ -22,7 +22,6 @@
 
 from osv import fields,osv
 
-
 def rounding(f, r):
     import math
     if not r:
@@ -41,71 +40,9 @@ class mrp_bom(osv.osv):
                                  help= "If a by-product is used in several products, it can be useful to create its own BoM. "\
                                  "Though if you don't want separated production orders for this by-product, select Set/Phantom as BoM type. "\
                                  "If a Phantom BoM is used for a root product, it will be sold and shipped as a set of components, instead of being produced."),
-        }
+    }
 
 mrp_bom()
-
-
-class sale_order_line(osv.osv):
-    _inherit = 'sale.order.line'
-    
-    def write(self, cr, uid, ids, vals, context=None):
-        sale_order_obj = self.pool.get('sale.order')
-        if context is None:
-            context = {}
-        for line in self.browse(cr, uid, ids, context=context):
-            try:
-                order_id = [line.order_id.id]
-            except:
-                order_id = []  
-            res = super(sale_order_line, self).write(cr, uid, ids, vals, context)
-            sale_order_obj.expand_bom(cr, uid, order_id, context=context, depth=0)
-            return res
-        return True
-    
-    def unlink(self, cr, uid, ids, context=None):
-        """
-        Desvincula desde el padre, jalando por cascade a los hijos
-        :param cr:
-        :param uid:
-        :param ids:
-        :param context:
-        :return:
-        """
-        sale_order_line_obj = self.pool.get('sale.order.line')
-        for line in sale_order_line_obj.browse(cr, uid, ids, context=context):
-            # para cada objeto, navegamos hacia el padre superior
-            if context.get('upwards', True):
-                try:
-                    while line.parent_sale_order_line:
-                        line = line.parent_sale_order_line
-                except ValueError:
-                    # Absorbemos cualquier excepcion en este punto.
-                    # Estas pueden darse por alguna cuestion relacionada a integridad referencial
-                    #   ya que el objeto padre puede haberse borrado en alguna otra iteracion anterior.
-                    pass
-
-            try:
-                return super(sale_order_line, self).unlink(cr, uid, [line.id], context=context)
-            except ValueError:
-                # Absorbemos cualquier excepcion en este punto.
-                # Estas pueden darse por alguna cuestion relacionada a integridad referencial
-                #   ya que el objeto padre puede haberse borrado en alguna otra iteracion anterior.
-                return True
-
-    _columns = {
-        'pack_depth': fields.integer('Depth', required=True, help='Depth of the product if it is part of a pack.'),
-        'bom_line': fields.boolean('Bom Lines'),
-        'parent_sale_order_line': fields.many2one('sale.order.line', string='Parent sale order line', required=False,
-                                                  help='Depth of the product if it is part of a pack.',
-                                                  ondelete="cascade")
-    }
-    _defaults={
-        'pack_depth': 0,
-        'parent_sale_order_line': 0
-    }
-
-sale_order_line()
 
 
 class sale_order(osv.osv):
@@ -186,7 +123,7 @@ class sale_order(osv.osv):
 
         return warnings
 
-    def expand_bom(self, cr, uid, ids, context=None, depth=0):
+    def expand_bom(self, cr, uid, ids, depth=0, context=None):
         if context is None:
             context={}
         if depth == 10:
@@ -233,6 +170,9 @@ class sale_order(osv.osv):
         return vals
     
     def create(self, cr, uid, vals, context=None):
+        '''
+        Se invoca el super de create para llamar el metodo expand_bom en el boton guardar
+        '''
         if context is None:
             context = {}
         res = super(sale_order, self).create(cr, uid, vals, context=context)
@@ -240,11 +180,91 @@ class sale_order(osv.osv):
         return res
     
     def write(self, cr, uid, ids, vals, context=None):
+        '''
+        Se invoca el super de write para llamar el metodo expand_bom ante cualquier modificacion en el encabezado del pedido
+        '''
         if context is None:
             context = {}
-        res = super(sale_order, self).write(cr, uid, ids, vals, context)
-        self.expand_bom(cr, uid, ids, context=context, depth=0)
+        res = super(sale_order, self).write(cr, uid, ids, vals, context=context)
+        for line in self.browse(cr, uid, ids, context):
+            #Solo se invoca al expand_bom en ciertos y determinados estados
+            if line.state not in ['cancel','waiting_date','progress','manual','shipping_except','invoice_except','done']:
+                self.expand_bom(cr, uid, ids, depth=0, context=context)
         return res
+    
+#     def copy(self, cr, uid, id, default=None, context=None):
+#         '''
+#         Cuando se duplica un pedido de venta, este metodo no debe copiar las lineas, solo el encabezado del pedido.
+#         '''
+#         default = {'order_line':[]}
+#         return super(sale_order, self).copy(cr, uid, id, default, context=context)
 
 sale_order()
+
+
+class sale_order_line(osv.osv):
+    _inherit = 'sale.order.line'
+    
+#     def write(self, cr, uid, ids, vals, context=None):
+#         '''
+#         Se invoca el super de write para llamar el metodo expand_bom ante cualquier modificacion en las lineas del pedido
+#         '''
+#         sale_order_obj = self.pool.get('sale.order')
+#         if context is None:
+#             context = {}
+#         for line in self.browse(cr, uid, ids, context=context):
+#             try:
+#                 order_id = [line.order_id.id]
+#             except:
+#                 order_id = []  
+#             res = super(sale_order_line, self).write(cr, uid, ids, vals, context=context)
+#             #Solo se invoca al expand_bom en ciertos y determinados estados
+#             if line.state not in ['cancel','waiting_date','progress','manual','shipping_except','invoice_except','done']:
+#                 sale_order_obj.expand_bom(cr, uid, order_id, context=context, depth=0)
+#             return res
+#         return True
+    
+    def unlink(self, cr, uid, ids, context=None):
+        """
+        Desvincula desde el padre, jalando por cascade a los hijos
+        :param cr:
+        :param uid:
+        :param ids:
+        :param context:
+        :return:
+        """
+        sale_order_line_obj = self.pool.get('sale.order.line')
+        for line in sale_order_line_obj.browse(cr, uid, ids, context=context):
+            # para cada objeto, navegamos hacia el padre superior
+            if context.get('upwards', True):
+                try:
+                    while line.parent_sale_order_line:
+                        line = line.parent_sale_order_line
+                except ValueError:
+                    # Absorbemos cualquier excepcion en este punto.
+                    # Estas pueden darse por alguna cuestion relacionada a integridad referencial
+                    # ya que el objeto padre puede haberse borrado en alguna otra iteracion anterior.
+                    pass
+
+            try:
+                return super(sale_order_line, self).unlink(cr, uid, [line.id], context=context)
+            except ValueError:
+                # Absorbemos cualquier excepcion en este punto.
+                # Estas pueden darse por alguna cuestion relacionada a integridad referencial
+                # ya que el objeto padre puede haberse borrado en alguna otra iteracion anterior.
+                return True
+
+    _columns = {
+        'pack_depth': fields.integer('Depth', required=True, help='Depth of the product if it is part of a pack.'),
+        'bom_line': fields.boolean('Bom Lines'),
+        'parent_sale_order_line': fields.many2one('sale.order.line', string='Parent sale order line', required=False,
+                                                  help='Depth of the product if it is part of a pack.',
+                                                  ondelete="cascade")
+    }
+    _defaults={
+        'pack_depth': 0,
+        'parent_sale_order_line': 0
+    }
+
+sale_order_line()
 
