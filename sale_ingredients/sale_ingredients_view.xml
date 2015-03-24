@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <openerp>
 	<data>
-		<!-- Ocultamos en campo sequence y el boton expand_bom en pedidos de venta -->
+		<!-- Ocultamos el campo sequence, el bom_line y el boton expand_bom en pedidos de venta, ademas pintamos de gray
+		     las lineas donde el spam_bom es true-->
         <record id="view_order_bom_expand_form" model="ir.ui.view">
             <field name="name">sale.order.bom_expand.form</field>
             <field name="model">sale.order</field>
@@ -10,8 +11,11 @@
                 <xpath expr="//tree/field[@name='sequence']" position="attributes">
 		    		<attribute name="invisible">1</attribute>
                 </xpath>
-                <xpath expr="//field[@name='order_line']/tree[@string='Sales Order Lines']" position="attributes">
-		    		<attribute name="colors">blue:[('bom_line','==',1)]</attribute>
+                <xpath expr="//tree/field[@name='sequence']" position="after">
+		    		<field name="bom_line" invisible="1"/>
+                </xpath>
+            	<xpath expr="//field[@name='order_line']/tree[@string='Sales Order Lines']" position="attributes">
+		    		<attribute name="colors">gray:bom_line == True</attribute>
                 </xpath>
                 <button name="action_quotation_send" position="after">
                     <button name="expand_bom" type="object" string="Expand bom" states="draft" class="oe_highlight" invisible="1"/>
