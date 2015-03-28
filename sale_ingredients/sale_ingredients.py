@@ -205,24 +205,24 @@ sale_order()
 class sale_order_line(osv.osv):
     _inherit = 'sale.order.line'
     
-#     def write(self, cr, uid, ids, vals, context=None):
-#         '''
-#         Se invoca el super de write para llamar el metodo expand_bom ante cualquier modificacion en las lineas del pedido
-#         '''
-#         sale_order_obj = self.pool.get('sale.order')
-#         if context is None:
-#             context = {}
-#         for line in self.browse(cr, uid, ids, context=context):
-#             try:
-#                 order_id = [line.order_id.id]
-#             except:
-#                 order_id = []  
-#             res = super(sale_order_line, self).write(cr, uid, ids, vals, context=context)
-#             #Solo se invoca al expand_bom en ciertos y determinados estados
-#             if line.state not in ['cancel','waiting_date','progress','manual','shipping_except','invoice_except','done']:
-#                 sale_order_obj.expand_bom(cr, uid, order_id, context=context, depth=0)
-#             return res
-#         return True
+    def write(self, cr, uid, ids, vals, context=None):
+        '''
+        Se invoca el super de write para llamar el metodo expand_bom ante cualquier modificacion en las lineas del pedido
+        '''
+        sale_order_obj = self.pool.get('sale.order')
+        if context is None:
+            context = {}
+        for line in self.browse(cr, uid, ids, context=context):
+            try:
+                order_id = [line.order_id.id]
+            except:
+                order_id = []  
+            res = super(sale_order_line, self).write(cr, uid, ids, vals, context=context)
+            #Solo se invoca al expand_bom en ciertos y determinados estados
+            if line.state not in ['cancel','waiting_date','progress','manual','shipping_except','invoice_except','done']:
+                sale_order_obj.expand_bom(cr, uid, order_id, context=context, depth=0)
+            return res
+        return True
     
     def unlink(self, cr, uid, ids, context=None):
         """
@@ -267,4 +267,3 @@ class sale_order_line(osv.osv):
     }
 
 sale_order_line()
-
