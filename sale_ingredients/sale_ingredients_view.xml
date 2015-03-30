@@ -21,7 +21,18 @@
                     <button name="expand_bom" type="object" string="Expand bom" states="draft" class="oe_highlight" invisible="1"/>
                 </button>
             </field>
-        </record>
+        </record>        
+        <!-- Ocultamos el campo sequence, en facturas de cliente-->
+        <record id="sale_ingredients_invoice_form" model="ir.ui.view">
+            <field name="name">sale.ingredients.invoice.form</field>
+            <field name="model">account.invoice</field>
+            <field name="inherit_id" ref="account.invoice_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//tree/field[@name='sequence']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+            </field>
+        </record>    
         <record id="view_mrp_bom_new_type_form" model="ir.ui.view">
             <field name="name">mrp.bom.form</field>
             <field name="model">mrp.bom</field>
