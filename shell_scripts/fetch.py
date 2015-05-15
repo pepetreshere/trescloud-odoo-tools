@@ -157,20 +157,28 @@ def git_pull(branch):
 
     if returned == 1:
         # la rama no existe: hay que crearla
+        print "Cargando y seleccionando nueva rama {branch} desde remoto".format(branch=branch)
         command = "git checkout -b {branch} --track origin/{branch}".format(branch=branch).split()
         returned = subprocess.call(command)
         if returned == 1:
             # la rama remota no existe
             print "¡¡¡ La rama remota {branch} no existe !!!".format(branch=branch)
+        else:
+            print "Seleccionada la rama {branch}".format(branch=branch)
     else:
         # la rama local existe
         # 1. stasheamos ...
+        print "Haciendo stash en rama {branch}".format(branch=branch)
         fecha_actual = datetime.now().strftime("%Y%m%d%H%M%S%f")
-        command = 'git stash save "Stashed on {fecha_actual} by fetcher.py"'.format(fecha_actual=fecha_actual).split(3)
+        print "..."
+        command = 'git stash save "Stashed on {fecha_actual} by fetcher.py"'.format(fecha_actual=fecha_actual).split(' ', 3)
+        print "..."
         returned_stash = subprocess.call(command)
+        print "..."
         if returned_stash != 0:
             print "¡¡¡ No se pudo hacer stash en la rama {branch} !!!".format(branch=branch)
         # 2. pulleamos ...
+        print "Haciendo pull en rama {branch}".format(branch=branch)
         command = "git pull origin {branch} ".format(branch=branch).split()
         returned = subprocess.call(command)
         if returned != 0:
@@ -190,6 +198,7 @@ def git_pull(branch):
                         # encontramos un stash con fecha actual y rama actual. obtenemos su indice
                         stash_index = match.group(0)
                         # intentamos hacer el stash pop
+                        print "Haciendo stash-pop en rama {branch}".format(branch=branch)
                         command = ("git stash pop stash@{%d}" % stash_index).split()
                         returned = subprocess.call(command)
                         if returned != 0:
@@ -202,7 +211,7 @@ def git_clone(repo, repo_name):
     git clone https://(user):(password)@github.com/(user)/(repo)
     """
     username = urllib.quote_plus(args['user'])
-    password = urllib.quote_plus(args['password'])
+    password = args['password']
     repository = urllib.quote(repo)
     if '/' not in repository:
         repository = username + '/' + repository
@@ -222,6 +231,7 @@ if input_option(u'Está a punto de crear los repositorios en "{directory}". ¿De
     
     initial_path = os.getcwd()
     try:
+        path = ''
         try:
             os.makedirs(args['directory'])
         except os.error as e:
@@ -259,8 +269,10 @@ Descargando rama %s en repositorio %s (usuario: %s)
         if e.errno == errno.ENOENT:
             print "No existe el directorio %s - probablemente no se pudo clonar" % path
         else:
-            print "Ocurrió una excepción: %s - %s" % (e)
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            print "Ocurrió una excepción en linea %d: %s - %s" % (exc_tb.tb_lineno, exc_type.__name__, exc_obj.message)
     except Exception as e:
-        print "Ocurrió una excepción: %s - %s" % (e)
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        print "Ocurrió una excepción en linea %d: %s - %s" % (exc_tb.tb_lineno, exc_type.__name__, exc_obj.message)
     finally:
         os.chdir(initial_path)
