@@ -162,7 +162,7 @@ def git_pull(branch):
         returned = subprocess.call(command)
         if returned == 1:
             # la rama remota no existe
-            print "¡¡¡ La rama remota {branch} no existe !!!".format(branch=branch)
+            print "¡¡¡ La rama remota {branch} no pudo ser pulleada (tal vez hay cambios conflictivos en el index, o la rama no existe) !!!".format(branch=branch)
         else:
             print "Seleccionada la rama {branch}".format(branch=branch)
     else:
