@@ -250,16 +250,6 @@ def nginx_maintenance(database):
 
 
 u"""
-X. Preparamos los datos del postgres (el password)
-"""
-
-
-def postgres_prepare():
-    #return invoke(["sudo su - postgres"])
-    return 0
-
-
-u"""
 3. Cortamos todas las conexiones existentes a postgres (para poder poner la base de datos
    y toda la aplicación en modo de mantenimiento).
 """
@@ -547,7 +537,6 @@ Backup: %s
 
 
 sys.exit(nginx_maintenance(database) or
-         postgres_prepare() or
          postgres_terminate(database, source_host, source_user, source_pass, source_port) or
          postgres_rename(database, source_host, source_user, source_pass, source_port, newname) or
          postgres_old_stats(newname, source_host, source_user, source_pass, source_port, stats_craete_filename,
