@@ -51,7 +51,7 @@ target_file = os.path.abspath(arguments.target_file)
 database = arguments.database
 oeexec_path = os.path.abspath(arguments.oeexec_path)
 server_name = '%s.facturadeuna.com' % database
-stats_craete_filename = os.path.join(os.getcwd(), 'stats_create.sql')
+stats_craete_filename = os.path.join(os.path.dirname(__file__), 'stats_create.sql')
 
 
 class PythonCoercibleConfigParser(ConfigParser):
@@ -169,7 +169,9 @@ def invoke(command, notify_error=True, ask_continue=True, *args, **kwargs):
     :returns: 0 si el proceso devolvio 0 o ante un error se permitió y se
       eligió continuar. 1 en otros casos.
     """
-    print u"Ejecutando: " + u" ".join(command)
+    if isinstance(command, list):
+        command = u" ".join(command)
+    print u"Ejecutando: " + command
     returned = subprocess.call(command, shell=True, *args, **kwargs)
     if returned and notify_error:
         error_message = u"El comando devolvió un código de error (%s)" % returned
@@ -248,12 +250,13 @@ def nginx_maintenance(database):
 
 
 u"""
-X. Inicio de sesion como postgres
+X. Preparamos los datos del postgres (el password)
 """
 
 
-def su_postgres():
-    return invoke("sudo su - postgres".split(' '))
+def postgres_prepare():
+    #return invoke(["sudo su - postgres"])
+    return 0
 
 
 u"""
@@ -275,12 +278,11 @@ def postgres_terminate(database, host, user, password, port):
     if port:
         psql_command.append('--port='+port)
     psql_command.append('--dbname='+database)
+    psql_command.append('--no-password')
     psql_command.append(('--command="select pg_terminate_backend(procpid) from pg_stat_activity where datname = \'%s\' '
                          'and procpid <> pg_backend_pid()"') % database)
-    if password:
-        psql_command = ['PGPASSWORD='+password] + psql_command
 
-    return invoke(psql_command)
+    return invoke(psql_command, env={'PGPASSWORD': password})
 
 
 u"""
@@ -299,12 +301,11 @@ def postgres_rename(database, host, user, password, port, newname):
         psql_command.append('--username='+user)
     if port:
         psql_command.append('--port='+port)
-    psql_command.append('--dbname='+database)
+    psql_command.append('--dbname=postgres')
+    psql_command.append('--no-password')
     psql_command.append('--command="alter database %s rename to %s"' % (database, newname))
-    if password:
-        psql_command = ['PGPASSWORD='+password] + psql_command
 
-    return invoke(psql_command)
+    return invoke(psql_command, env={'PGPASSWORD': password})
 
 
 u"""
@@ -325,9 +326,8 @@ def postgres_old_stats(newname, host, user, password, port, sql_filename, output
     if port:
         psql_command.append('--port='+port)
     psql_command.append('--dbname='+newname)
+    psql_command.append('--no-password')
     psql_command.append('< ' + sql_filename)
-    if password:
-        psql_command = ['PGPASSWORD='+password] + psql_command
 
     psql_command_get = ['psql']
     if host:
@@ -337,13 +337,12 @@ def postgres_old_stats(newname, host, user, password, port, sql_filename, output
     if port:
         psql_command_get.append('--port='+port)
     psql_command_get.append('--dbname='+newname)
+    psql_command_get.append('--no-password')
     psql_command_get.append('--command="select table_schema, table_name, count_rows(table_schema, table_name) from '
                             'information_schema.tables where table_schema not in (\'pg_catalog\', '
                             '\'information_schema\') and table_type=\'BASE TABLE\' order by 1, 2 desc"')
     psql_command_get.append('> ' + output_filename)
-    if password:
-        psql_command_get = ['PGPASSWORD='+password] + psql_command_get
-    return invoke(psql_command) or invoke(psql_command_get)
+    return invoke(psql_command, env={'PGPASSWORD': password}) or invoke(psql_command_get, env={'PGPASSWORD': password})
 
 
 u"""
@@ -362,12 +361,13 @@ def postgres_dump(database, host, user, password, port, newname):
         pg_dump_command.append('--username='+user)
     if port:
         pg_dump_command.append('--port='+port)
-    pg_dump_command.append('--dbname='+newname)
-    pg_dump_command.append('-f /tmp/%s.sql' % database)
-    if password:
-        pg_dump_command = ['PGPASSWORD='+password] + pg_dump_command
+    pg_dump_command.append('--no-password')
+    pg_dump_command.append('--create')
+    pg_dump_command.append('--format=custom')
+    pg_dump_command.append('-f /tmp/%s.dump' % database)
+    pg_dump_command.append(newname)
 
-    return invoke(pg_dump_command)
+    return invoke(pg_dump_command, env={'PGPASSWORD': password})
 
 
 u"""
@@ -383,15 +383,13 @@ def postgres_block(newname, host, user, password, port):
     if host:
         pg_block_command.append('--host='+host)
     if user:
-        pg_block_command.append('--username='+user)
+        pg_block_command.append('--username=postgres')
     if port:
         pg_block_command.append('--port='+port)
     pg_block_command.append('--dbname='+newname)
     pg_block_command.append('--command="update pg_database set datallowconn = false where datname = \'%s\'"' % newname)
-    if password:
-        pg_block_command = ['PGPASSWORD='+password] + pg_block_command
 
-    return invoke(pg_block_command)
+    return invoke(pg_block_command, env={'PGPASSWORD': password})
 
 
 u"""
@@ -406,6 +404,7 @@ def postgres_create(database, host, user, password, port):
 
     # Crear base de datos
     createdb_command = ['createdb']
+    createdb_command.append('--no-password')
     if database:
         createdb_command.append(database)
     if host:
@@ -414,11 +413,10 @@ def postgres_create(database, host, user, password, port):
         createdb_command.append('--username='+user)
     if port:
         createdb_command.append('--port='+port)
-    if password:
-        createdb_command = ['PGPASSWORD='+password] + createdb_command
 
     # Importar base de datos
     pg_restore_command = ['pg_restore', '-n', 'public', '--no-owner']
+    pg_restore_command.append('--no-password')
     if host:
         pg_restore_command.append('--host='+host)
     if user:
@@ -427,11 +425,10 @@ def postgres_create(database, host, user, password, port):
         pg_restore_command.append('--port='+port)
     if database:
         pg_restore_command.append('--dbname='+database)
-    pg_restore_command.append('/tmp/%s.sql' % database)
-    if password:
-        pg_restore_command = ['PGPASSWORD='+password] + pg_restore_command
+    pg_restore_command.append('/tmp/%s.dump' % database)
 
-    return invoke(createdb_command) or invoke(pg_restore_command)
+    return invoke(createdb_command,
+                  env={'PGPASSWORD': password}) or invoke(pg_restore_command, env={'PGPASSWORD': password})
 
 
 u"""
@@ -439,7 +436,7 @@ u"""
 """
 
 
-def postgres_new_stats(newname, host, user, password, port, output_filename):
+def postgres_new_stats(database, host, user, password, port, output_filename):
     """
     Obtiene las estadísticas de la nueva tabla, ya que la funcion ya existe.
     """
@@ -451,14 +448,13 @@ def postgres_new_stats(newname, host, user, password, port, output_filename):
         psql_command_get.append('--username='+user)
     if port:
         psql_command_get.append('--port='+port)
-    psql_command_get.append('--dbname='+newname)
+    psql_command_get.append('--dbname='+database)
+    psql_command_get.append('--no-password')
     psql_command_get.append('--command="select table_schema, table_name, count_rows(table_schema, table_name) from '
                             'information_schema.tables where table_schema not in (\'pg_catalog\', '
                             '\'information_schema\') and table_type=\'BASE TABLE\' order by 1, 2 desc"')
     psql_command_get.append('> ' + output_filename)
-    if password:
-        psql_command_get = ['PGPASSWORD='+password] + psql_command_get
-    return invoke(psql_command_get)
+    return invoke(psql_command_get, env={'PGPASSWORD': password})
 
 
 u"""
@@ -472,7 +468,7 @@ def postgres_diff(old_output_file, new_output_file):
       archivos son diferentes.
     """
 
-    return invoke(['diff', old_output_file, new_output_file])
+    return invoke(['diff %s %s' % (old_output_file, new_output_file)])
 
 
 u"""
@@ -485,7 +481,7 @@ def openerp_update(openerp_path, target_config_file, database):
     Corre el openerp para el nuevo servidor.
     """
 
-    openerp_command = ['time', os.path.join(openerp_path, 'openerp-server.py'),
+    openerp_command = ['time', os.path.join(openerp_path, 'openerp-server'),
                        '-c', target_config_file, '-d', database, '-u', 'all', '--stop-after-init']
     return invoke(openerp_command)
 
@@ -524,12 +520,34 @@ def confirm(newname):
 
 
 newname = database + '_' + datetime.datetime.now().strftime('%Y%m%d%H%I%S')
-stats_old = '~/%s.old.txt' % database
-stats_new = '~/%s.new.txt' % database
+stats_old = '/tmp/%s.old.txt' % database
+stats_new = '/tmp/%s.new.txt' % database
+
+
+print u"""
+Configuración de origen:
+  host: %s
+  puerto: %s
+  usuario: %s
+  password: %s
+  puerto OE: %s
+
+Configuración de destino:
+  host: %s
+  puerto: %s
+  usuario: %s
+  password: %s
+  puerto OE: %s
+
+Base de datos: %s
+Backup: %s
+""" % (source_host, source_port, source_user, source_pass, source_oe_port,
+       target_host, target_port, target_user, target_pass, target_oe_port,
+       database, newname)
 
 
 sys.exit(nginx_maintenance(database) or
-         su_postgres() or
+         postgres_prepare() or
          postgres_terminate(database, source_host, source_user, source_pass, source_port) or
          postgres_rename(database, source_host, source_user, source_pass, source_port, newname) or
          postgres_old_stats(newname, source_host, source_user, source_pass, source_port, stats_craete_filename,
@@ -537,7 +555,7 @@ sys.exit(nginx_maintenance(database) or
          postgres_dump(database, source_host, source_user, source_pass, source_port, newname) or
          postgres_block(newname, source_host, source_user, source_pass, source_port) or
          postgres_create(database, target_host, target_user, target_pass, target_port) or
-         postgres_new_stats(newname, target_host, target_user, target_pass, target_port, stats_new) or
+         postgres_new_stats(database, target_host, target_user, target_pass, target_port, stats_new) or
          postgres_diff(stats_old, stats_new) or
          openerp_update(oeexec_path, target_file, database) or
          nginx_new(database) or
