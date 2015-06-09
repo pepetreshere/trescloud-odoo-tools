@@ -19,6 +19,7 @@ import datetime
 import argparse
 import sys
 import os
+import re
 
 parser = argparse.ArgumentParser(description=u"Dados dos archivos de configuración de OpenERP, intenta realizar una "
                                              u"migración desde una base de datos en un servidor hacia otra en otro "
@@ -43,15 +44,24 @@ parser.add_argument('oeexec_path', metavar="ubicacion de openerp-server", type=s
                     help=u"Directorio donde se encuentra el archivo openerp-server.py, ej "
                          u"/usr/local/bin/openerp-deploy si el ejecutable se ubica en "
                          u"/usr/local/bin/openerp-deploy/openerp-server.py")
+parser.add_argument('-i', '--inverse', default=False, destination='inverse', action='store_true', type=bool,
+                    help=u"Determina si la migración se va a realizar desde 'producción' a 'frankenstein'. "
+                         u"Si esta opción no se especifica, el sentido es 'frankenstein' a 'producción'.")
 
 arguments = parser.parse_args()
 
 source_file = os.path.abspath(arguments.source_file)
 target_file = os.path.abspath(arguments.target_file)
 database = arguments.database
+inverse = arguments.inverse
 oeexec_path = os.path.abspath(arguments.oeexec_path)
 server_name = '%s.facturadeuna.com' % database
 stats_craete_filename = os.path.join(os.path.dirname(__file__), 'stats_create.sql')
+subconf_master = os.path.expanduser('~/nginx-confs/sites-enabled/active-server.subconf')
+subconf_frankenstein = os.path.expanduser('~/nginx-confs/sites-enabled/active-server.subconf')
+subconf_maintenance = os.path.expanduser('~/nginx-confs/sites-enabled/maintenance-server.subconf')
+# server_name y to' lo que se pueda separar con espacios y terminar en ;
+rx_servername = r'server_name\s+(.+(\s+.+)*)\s*;'
 
 
 class PythonCoercibleConfigParser(ConfigParser):
@@ -244,9 +254,80 @@ u"""
 """
 
 
-def nginx_maintenance(database):
-    # TODO HACER ESTE PUNTO.
-    return 0
+def nginx_maintenance(database, inverse):
+    origin, maintenance = (subconf_frankenstein if inverse else subconf_master), subconf_maintenance
+    try:
+        try:
+            with open(origin) as f:
+                content = f.read()
+                match = re.match(rx_servername, content)
+                if not match:
+                    print >> sys.stderr, u"El archivo no tiene el formato correcto. No se pudo encontrar una directiva " \
+                                         u"server_name. Asegúrese de que el contenido del archivo contenga una directiva " \
+                                         u"server_name."
+                    if input_option(u'Ocurrió un error al intentar abrir el archivo de configuración de origen. '
+                                    u'Se omitirá el resto de la configuración de nginx y se procederá con los '
+                                    u'siguientes pasos ¿desea continuar?', stderr=True) == 'n':
+                        return 1
+                    else:
+                        return 0
+                else:
+                    entries = re.split('\s+', match.groups()[0])
+                    try:
+                        entries.remove(database + '.facturadeuna.com')
+                    except:
+                        pass
+                    directive = 'server_name %s;' % (' '.join(entries),)
+
+            with open(origin, 'w') as f:
+                f.write(directive)
+        except (IOError, OSError) as e:
+            if input_option(u"Ocurrió un error al intentar abrir el archivo de configuración de origen: %s. "
+                            u'Se omitirá el resto de la configuración de nginx y se procederá con los '
+                            u'siguientes pasos ¿desea continuar?' % origin, stderr=True) == 'n':
+                return 1
+            else:
+                return 0
+
+        try:
+            with open(maintenance) as f:
+                content = f.read()
+                match = re.match(rx_servername, content)
+                if not match:
+                    print >> sys.stderr, u"El archivo no tiene el formato correcto. No se pudo encontrar una directiva " \
+                                         u"server_name. Asegúrese de que el contenido del archivo contenga una directiva " \
+                                         u"server_name."
+                    if input_option(u'Ocurrió un error al intentar abrir el archivo de configuración de mantenimiento. '
+                                    u'Se omitirá el resto de la configuración de nginx y se procederá con los '
+                                    u'siguientes pasos ¿desea continuar?', stderr=True) == 'n':
+                        return 1
+                    else:
+                        return 0
+                else:
+                    entries = re.split('\s+', match.groups()[0])
+                    try:
+                        entries.append(database + '.facturadeuna.com')
+                    except:
+                        pass
+                    directive = 'server_name %s;' % (' '.join(entries),)
+
+            with open(maintenance, 'w') as f:
+                f.write(directive)
+        except (IOError, OSError) as e:
+            if input_option(u"Ocurrió un error al intentar abrir el archivo de configuración de mantenimiento: %s. "
+                            u'Se omitirá el resto de la configuración de nginx y se procederá con los '
+                            u'siguientes pasos ¿desea continuar?' % maintenance, stderr=True) == 'n':
+                return 1
+            else:
+                return 0
+    except Exception as e:
+        if input_option(u"Ocurrió un error al intentar acceder a las configuraciones de nginx para poner "
+                        u"en mantenimiento ¿desea continuar?") == 'n':
+            return 1
+        else:
+            return 0
+
+    return invoke("sudo nginx -t") or invoke("sudo nginx reload")
 
 
 u"""
@@ -368,8 +449,16 @@ u"""
 def postgres_block(newname, host, user, password, port):
     """
     Realiza un dump de la base de datos en formato sql.
+
+    REQUIERE MODIFICAR EL pg_hba (/etc/postgresql/9.1/main/pg_hba.conf)
+      tenga lineas:
+
+    host    all             postgres        ::1/128                 peer
+    host    all             postgres        127.0.0.1/32            peer
+
+    abajo de la primer linea (la que es igual pero con local para el usuario postgres)
     """
-    pg_block_command = ['psql']
+    pg_block_command = ['sudo -u postgres psql']
     if host:
         pg_block_command.append('--host='+host)
     if user:
@@ -481,12 +570,83 @@ u"""
 """
 
 
-def nginx_new(database):
+def nginx_new(database, inverse):
     """
     Hacemos que el nginx apunte al nuevo servidor
     """
-    # TODO hacer esto
-    return 0
+    target, maintenance = (subconf_master if inverse else subconf_frankenstein), subconf_maintenance
+    try:
+        try:
+            with open(maintenance) as f:
+                content = f.read()
+                match = re.match(rx_servername, content)
+                if not match:
+                    print >> sys.stderr, u"El archivo no tiene el formato correcto. No se pudo encontrar una directiva " \
+                                         u"server_name. Asegúrese de que el contenido del archivo contenga una directiva " \
+                                         u"server_name."
+                    if input_option(u'Ocurrió un error al intentar abrir el archivo de configuración de origen. '
+                                    u'Se omitirá el resto de la configuración de nginx y se procederá con los '
+                                    u'siguientes pasos ¿desea continuar?', stderr=True) == 'n':
+                        return 1
+                    else:
+                        return 0
+                else:
+                    entries = re.split('\s+', match.groups()[0])
+                    try:
+                        entries.remove(database + '.facturadeuna.com')
+                    except:
+                        pass
+                    directive = 'server_name %s;' % (' '.join(entries),)
+
+            with open(maintenance, 'w') as f:
+                f.write(directive)
+        except (IOError, OSError) as e:
+            if input_option(u"Ocurrió un error al intentar abrir el archivo de configuración de mantenimiento: %s. "
+                            u'Se omitirá el resto de la configuración de nginx y se procederá con los '
+                            u'siguientes pasos ¿desea continuar?' % maintenance, stderr=True) == 'n':
+                return 1
+            else:
+                return 0
+
+        try:
+            with open(maintenance) as f:
+                content = f.read()
+                match = re.match(rx_servername, content)
+                if not match:
+                    print >> sys.stderr, u"El archivo no tiene el formato correcto. No se pudo encontrar una directiva " \
+                                         u"server_name. Asegúrese de que el contenido del archivo contenga una directiva " \
+                                         u"server_name."
+                    if input_option(u'Ocurrió un error al intentar abrir el archivo de configuración de mantenimiento. '
+                                    u'Se omitirá el resto de la configuración de nginx y se procederá con los '
+                                    u'siguientes pasos ¿desea continuar?', stderr=True) == 'n':
+                        return 1
+                    else:
+                        return 0
+                else:
+                    entries = re.split('\s+', match.groups()[0])
+                    try:
+                        entries.append(database + '.facturadeuna.com')
+                    except:
+                        pass
+                    directive = 'server_name %s;' % (' '.join(entries),)
+
+            with open(maintenance, 'w') as f:
+                f.write(directive)
+        except (IOError, OSError) as e:
+            if input_option(u"Ocurrió un error al intentar abrir el archivo de configuración de destino: %s. "
+                            u'Se omitirá el resto de la configuración de nginx y se procederá con los '
+                            u'siguientes pasos ¿desea continuar?' % target, stderr=True) == 'n':
+                return 1
+            else:
+                return 0
+    except Exception as e:
+        if input_option(u"Ocurrió un error al intentar acceder a las configuraciones de nginx para poner "
+                        u"en funcionamiento ¿desea continuar?") == 'n':
+            return 1
+        else:
+            return 0
+
+    return invoke("sudo nginx -t") or invoke("sudo nginx reload")
 
 
 u"""
@@ -536,7 +696,7 @@ Backup: %s
        database, newname)
 
 
-sys.exit(nginx_maintenance(database) or
+sys.exit(nginx_maintenance(database, inverse) or
          postgres_terminate(database, source_host, source_user, source_pass, source_port) or
          postgres_rename(database, source_host, source_user, source_pass, source_port, newname) or
          postgres_old_stats(newname, source_host, source_user, source_pass, source_port, stats_craete_filename,
@@ -547,5 +707,5 @@ sys.exit(nginx_maintenance(database) or
          postgres_new_stats(database, target_host, target_user, target_pass, target_port, stats_new) or
          postgres_diff(stats_old, stats_new) or
          openerp_update(oeexec_path, target_file, database) or
-         nginx_new(database) or
+         nginx_new(database, inverse) or
          confirm(newname))
