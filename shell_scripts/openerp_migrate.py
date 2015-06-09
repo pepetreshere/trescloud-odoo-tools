@@ -446,14 +446,6 @@ u"""
 def postgres_block(newname, host, user, password, port):
     """
     Realiza un dump de la base de datos en formato sql.
-
-    REQUIERE MODIFICAR EL pg_hba (/etc/postgresql/9.1/main/pg_hba.conf)
-      tenga lineas:
-
-    host    all             postgres        ::1/128                 peer
-    host    all             postgres        127.0.0.1/32            peer
-
-    abajo de la primer linea (la que es igual pero con local para el usuario postgres)
     """
     pg_block_command = ['sudo -u postgres psql']
     if host:
