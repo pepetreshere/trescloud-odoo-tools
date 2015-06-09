@@ -44,7 +44,7 @@ parser.add_argument('oeexec_path', metavar="ubicacion de openerp-server", type=s
                     help=u"Directorio donde se encuentra el archivo openerp-server.py, ej "
                          u"/usr/local/bin/openerp-deploy si el ejecutable se ubica en "
                          u"/usr/local/bin/openerp-deploy/openerp-server.py")
-parser.add_argument('-i', '--inverse', default=False, destination='inverse', action='store_true', type=bool,
+parser.add_argument('-i', '--inverse', default=False, dest='inverse', action='store_true',
                     help=u"Determina si la migración se va a realizar desde 'producción' a 'frankenstein'. "
                          u"Si esta opción no se especifica, el sentido es 'frankenstein' a 'producción'.")
 
@@ -260,7 +260,7 @@ def nginx_maintenance(database, inverse):
         try:
             with open(origin) as f:
                 content = f.read()
-                match = re.match(rx_servername, content)
+                match = re.search(rx_servername, content)
                 if not match:
                     print >> sys.stderr, u"El archivo no tiene el formato correcto. No se pudo encontrar una directiva " \
                                          u"server_name. Asegúrese de que el contenido del archivo contenga una directiva " \
@@ -292,7 +292,7 @@ def nginx_maintenance(database, inverse):
         try:
             with open(maintenance) as f:
                 content = f.read()
-                match = re.match(rx_servername, content)
+                match = re.search(rx_servername, content)
                 if not match:
                     print >> sys.stderr, u"El archivo no tiene el formato correcto. No se pudo encontrar una directiva " \
                                          u"server_name. Asegúrese de que el contenido del archivo contenga una directiva " \
@@ -305,11 +305,8 @@ def nginx_maintenance(database, inverse):
                         return 0
                 else:
                     entries = re.split('\s+', match.groups()[0])
-                    try:
-                        entries.append(database + '.facturadeuna.com')
-                    except:
-                        pass
-                    directive = 'server_name %s;' % (' '.join(entries),)
+                    entries.append(database + '.facturadeuna.com')
+                    directive = 'server_name %s;' % (' '.join(list(set(entries))),)
 
             with open(maintenance, 'w') as f:
                 f.write(directive)
@@ -327,7 +324,7 @@ def nginx_maintenance(database, inverse):
         else:
             return 0
 
-    return invoke("sudo nginx -t") or invoke("sudo nginx reload")
+    return invoke("sudo nginx -t") or invoke("sudo service nginx restart")
 
 
 u"""
@@ -560,7 +557,7 @@ def openerp_update(openerp_path, target_config_file, database):
     Corre el openerp para el nuevo servidor.
     """
 
-    openerp_command = ['time', os.path.join(openerp_path, 'openerp-server'),
+    openerp_command = ['time python', os.path.join(openerp_path, 'openerp-server'),
                        '-c', target_config_file, '-d', database, '-u', 'all', '--stop-after-init']
     return invoke(openerp_command)
 
@@ -579,7 +576,7 @@ def nginx_new(database, inverse):
         try:
             with open(maintenance) as f:
                 content = f.read()
-                match = re.match(rx_servername, content)
+                match = re.search(rx_servername, content)
                 if not match:
                     print >> sys.stderr, u"El archivo no tiene el formato correcto. No se pudo encontrar una directiva " \
                                          u"server_name. Asegúrese de que el contenido del archivo contenga una directiva " \
@@ -609,9 +606,9 @@ def nginx_new(database, inverse):
                 return 0
 
         try:
-            with open(maintenance) as f:
+            with open(target) as f:
                 content = f.read()
-                match = re.match(rx_servername, content)
+                match = re.search(rx_servername, content)
                 if not match:
                     print >> sys.stderr, u"El archivo no tiene el formato correcto. No se pudo encontrar una directiva " \
                                          u"server_name. Asegúrese de que el contenido del archivo contenga una directiva " \
@@ -624,13 +621,10 @@ def nginx_new(database, inverse):
                         return 0
                 else:
                     entries = re.split('\s+', match.groups()[0])
-                    try:
-                        entries.append(database + '.facturadeuna.com')
-                    except:
-                        pass
-                    directive = 'server_name %s;' % (' '.join(entries),)
+                    entries.append(database + '.facturadeuna.com')
+                    directive = 'server_name %s;' % (' '.join(list(set(entries))),)
 
-            with open(maintenance, 'w') as f:
+            with open(target, 'w') as f:
                 f.write(directive)
         except (IOError, OSError) as e:
             if input_option(u"Ocurrió un error al intentar abrir el archivo de configuración de destino: %s. "
@@ -646,7 +640,7 @@ def nginx_new(database, inverse):
         else:
             return 0
 
-    return invoke("sudo nginx -t") or invoke("sudo nginx reload")
+    return invoke("sudo nginx -t") or invoke("sudo service nginx restart")
 
 
 u"""
