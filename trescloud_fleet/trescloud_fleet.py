@@ -16,15 +16,12 @@ class fleet_vehicle(osv.osv):
     _inherit = 'fleet.vehicle'
 
     def _get_odometer(self, cr, uid, ids, odometer_id, arg, context):
-        v = super(fleet_vehicle,self)._get_odometer(cr, uid, ids, odometer_id, arg, context=context)
-        return v 
+        vals = super(fleet_vehicle, self)._get_odometer(cr, uid, ids, odometer_id, arg, context=context)
+        return vals
     
     def _set_odometer(self, cr, uid, id, name, value, args=None, context=None):
-         if value:
-            date = fields.date.context_today(self, cr, uid, context=context)
-            driver_id = self.browse(cr, uid, id, context=context).driver_id
-            data = {'value': value, 'date': date, 'vehicle_id': id, 'driver_id':driver_id.id}
-            return self.pool.get('fleet.vehicle.odometer').create(cr, uid, data, context=context)
+        vals = super(fleet_vehicle, self)._set_odometer(cr, uid, id, name, value, args, context=context)
+        return vals
            
     _columns={
               'odometer': fields.function(_get_odometer, fnct_inv=_set_odometer, type='float', string='Last Odometer', help='Odometer measure of the vehicle at the moment of this log'),
@@ -54,13 +51,17 @@ class fleet_vehicle(osv.osv):
             }
         return {'value' : values}
     
-    def on_change_odometer(self, cr, uid, ids, vals, context=None):
-        for vehicle in self.browse(cr, uid, ids, context):
-            old_odometer = vehicle.odometer or _('None')
-            if old_odometer >= vals:
-                raise osv.except_osv(_('Invalid action!'), _('The date Value is not valid because is less than the last Value for the odometer'))
-                if old_odometer < vals:
-                    return old_odometer;
+    def on_change_odometer(self, cr, uid, ids, odometer, context=None):
+        if context is None:
+            context = {}
+        vals = {}
+        if ids:
+            for vehicle in self.browse(cr, uid, ids, context):
+                old_odometer = vehicle.odometer
+                if old_odometer > odometer:
+                    raise osv.except_osv(_('Invalid action!'), 
+                                         _('The new reading should be greater than or equal to the accumulated read for this equipment.'))
+                vals.update({'odometer': odometer})
         return vals
     
     def create(self, cr, uid, data, context=None):
@@ -84,10 +85,10 @@ class fleet_vehicle(osv.osv):
                 value = self.pool.get('res.partner').browse(cr,uid,vals['driver_id'],context=context).name
                 olddriver = (vehicle.driver_id.name) or _('None')
                 changes.append(_("Driver: from '%s' to '%s'") %(olddriver, value))
-            if 'odometer' in vals and vehicle.odometer != vals['odometer']:
-                old_odometer = vehicle.odometer or _('None')
-                if old_odometer >= vals['odometer']:
-                    raise osv.except_osv(_('Invalid action!'), _('The date Value is not valid because is less than the last Value for the odometer'))
+            if 'odometer' in vals and vehicle.odometer <= vals['odometer']:
+                old_odometer = vehicle.odometer
+                if old_odometer > vals['odometer']:
+                    raise osv.except_osv(_('Invalid action!'), _('The new reading should be greater than or equal to the accumulated read for this equipment.'))
                 else:
                     changes.append(_("Odometer: from '%s' to '%s'") %(old_odometer, vals['odometer']))
             if 'state_id' in vals and vehicle.state_id.id != vals['state_id']:
@@ -118,6 +119,7 @@ class trescloud_partner(osv.osv):
               #'function': 'Conductor',
             }
 trescloud_partner()
+
 class fleet_vehicle_cost(osv.Model):
     _inherit = 'fleet.vehicle.cost'
 
@@ -314,7 +316,7 @@ class fleet_vehicle_odometer(osv.Model):
         }
 
     _columns = {
-        'driver_id': fields.many2one('res.partner', 'Conductor', required=True),
+        'driver_id': fields.many2one('res.partner', 'Conductor'),
     }
     
 
