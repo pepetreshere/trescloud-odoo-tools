@@ -65,8 +65,18 @@ def chunk(elements, bulk):
         k += bulk
 
 
+def escape(v):
+    if isinstance(v, (int, long, float)):
+        return v
+    if v is None or len(v) == 0:
+        return "NULL"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    return "'" + unicode(v).replace("'", "''") + "'"
+
+
 def sql_insert_line(row):
-    return "(%s)" % (",".join("'%s'" % v.replace("'", "''") for v in row))
+    return "(%s)" % (",".join(escape(v) for v in row))
 
 
 def sql_insert_lines(rows):
@@ -74,7 +84,7 @@ def sql_insert_lines(rows):
 
 
 def sql_insert(table, columns, rows):
-    return "insert into %s(%s) values %s" % (table, ",".join(columns), sql_insert_lines(rows))
+    return "insert into %s(%s) values\n%s;" % (table, ",".join(columns), sql_insert_lines(rows))
 
 
 if not table:
