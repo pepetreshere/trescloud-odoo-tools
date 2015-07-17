@@ -91,7 +91,6 @@ try:
 
     for row in reader(sys.stdin, delimiter=delimiter, quotechar=quote, escapechar=escape_char,
                       doublequote=double_quote, skipinitialspace=skip_spaces, strict=True):
-        print "Reading line ...", row
         if first:
             columns = row
             first = False
@@ -100,8 +99,6 @@ try:
 
     if first:
         fuckyou("CSV File was empty. No SQL file was generated", 1)
-
-    print result
 
     for chunked in chunk(result, sql_bulk):
         print sql_insert(table, columns, chunked)
