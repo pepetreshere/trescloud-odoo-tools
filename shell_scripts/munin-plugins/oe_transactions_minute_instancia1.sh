@@ -11,7 +11,7 @@ case $1 in
     config)
         echo graph_category openerp
         echo "graph_title openerp rpc request count (all instancia1)"
-        echo graph_vlabel num requests/minute in last 30 minutes
+        echo graph_vlabel num requests/minute in last 5 minutes
         echo requests.label num requests
         exit 0
     ;;
