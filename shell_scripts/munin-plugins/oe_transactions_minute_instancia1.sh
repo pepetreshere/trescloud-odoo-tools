@@ -16,5 +16,5 @@ case $1 in
         exit 0
     ;;
 esac
-result=`/usr/local/bin/munin-openerp/oe_transactions_minute.sh "[a-zA-Z0-9_]*" i-f2997d21 openerp70_instancia1 openerp-server-multicore`
+result=`/usr/local/bin/munin-openerp/oe_transactions_minute.sh "[a-zA-Z0-9_]*" openerp70_instancia1 openerp-server-multicore`
 echo "requests.value $result"

@@ -16,7 +16,7 @@ case $1 in
         exit 0
     ;;
 esac
-result=`/usr/local/bin/munin-openerp/oe_response_time.sh beraca i-f2997d21 instancia-08-retail openerp-server-multicore`
+result=`/usr/local/bin/munin-openerp/oe_response_time.sh beraca instancia-08-retail openerp-server-multicore`
 echo -n "min.value "
 echo ${result} | cut -d" " -f1
 echo -n "avg.value "
