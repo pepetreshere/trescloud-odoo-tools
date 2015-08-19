@@ -1,7 +1,7 @@
 BEGIN {
     sum=0; count=0; min=0;
 }
-($1 " " substr($2, 0, 8)) > FECHA {
+{
     split($8, t, ":");
     time = 0 + t[2];
     sum += time;
