@@ -4,7 +4,7 @@
 case $1 in
     config)
         echo graph_category openerp
-        echo "graph_title openerp rpc requests min/average response time (beraca in instancia1)"
+        echo "graph_title openerp rpc requests min/average response time (beraca in instancia-08-retail)"
         echo graph_vlabel seconds
         echo graph_args --units-exponent -3
         echo min.label min
