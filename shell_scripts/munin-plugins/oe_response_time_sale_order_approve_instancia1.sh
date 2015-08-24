@@ -7,6 +7,7 @@ case $1 in
         echo "graph_title openerp rpc requests (sale.order approval in retail) min/average response time (all instancia1)"
         echo graph_vlabel seconds
         echo graph_args --units-exponent -3
+        echo graph_scale no
         echo min.label min
         echo min.warning 1
         echo min.critical 5
