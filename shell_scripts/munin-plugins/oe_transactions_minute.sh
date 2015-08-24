@@ -7,5 +7,5 @@ BULK_FILE=$(cd `dirname $0` && pwd)/oe_log_bulk.sh
 DATABASE="$1"
 PROCESS="$2"
 LOGFILE="$3"
-result=$($BULK_FILE $PROCESS $LOGFILE 5 | grep "DEBUG $DATABASE openerp.netsvc.rpc.request: object.execute_kw time" | awk -f $AWK_FILE)
-awk "BEGIN{print $result / 5}"
+$BULK_FILE $PROCESS $LOGFILE 5 | grep "DEBUG $DATABASE openerp.netsvc.rpc.request: object.execute_kw time" | awk -f $AWK_FILE
+# awk "BEGIN{print $result / 5}"
