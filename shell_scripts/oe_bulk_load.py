@@ -13,7 +13,6 @@
 # Importamos erppeek
 from argparse import ArgumentParser
 import os
-import warning
 import erppeek
 import re
 import csv
@@ -29,7 +28,7 @@ parser = ArgumentParser(description="Toma un archivo .csv (*.csv) y lo parsea co
                                     "a ingresar en el modelo de OpenERP especificado.")
 
 # Base de datos y modelo a afectar.
-parser.add_argument('-h', '--host', metavar='host', dest="host", type=str, default='127.0.0.1',
+parser.add_argument('-H', '--host', metavar='host', dest="host", type=str, default='127.0.0.1',
                     help=u"Host al cual conectarse.")
 parser.add_argument('-p', '--port', metavar='port', dest="port", type=int, default=8069,
                     help=u"Puerto al cual conectarse.")
@@ -89,7 +88,7 @@ if not arguments.database.strip():
     fuckyou('Ninguna base de datos fue especificada', 1)
 
 
-OE_HOST = '%s://%s:%s' % (('http' if arguments.https else 'https'), arguments.host, arguments.port)
+OE_HOST = '%s://%s:%s' % (('https' if arguments.https else 'http'), arguments.host, arguments.port)
 OE_DB = arguments.database.strip()  # Base de Datos de OpenERP a conectarse
 OE_LOGIN = arguments.user  # Usuario de OpenERP para consultas, debe tener Permisos
 OE_MODEL = arguments.model
@@ -226,4 +225,4 @@ for rownum, row in enumerate(csv_reader):
                     print "error at record number: " + str(rownum)
                     print >> sys.stderr, "Exception %s updating item %d: %s" % (type(e).__name__, id_, str(e))
                 linea_resul_csv = str(rownum) + "," + str(id_) + "," + "ERROR"
-        print >> OE_RESULT_FILE, linea_resul_csv + "\n"
+        print >> OE_RESULT_FILE, linea_resul_csv
