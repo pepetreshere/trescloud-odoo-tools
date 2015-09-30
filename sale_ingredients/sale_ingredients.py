@@ -147,7 +147,7 @@ class sale_order(osv.osv):
                         'tax_id': [(6, 0, result.get('value', {}).get('tax_id'))],
                         'type': bom_line.product_id.procure_method,
                         'product_uom_qty': result.get('value', {}).get('product_uos_qty'),
-                        'product_uom': result.get('value', {}).get('product_uom') or line.product_id.uom_id.id,
+                        'product_uom': result.get('value', {}).get('product_uom') or bom_line.product_id.uom_id.id,
                         'product_uos_qty': result.get('value', {}).get('product_uos_qty'),
                         'product_uos': result.get('value', {}).get('product_uos') or line.product_id.uos_id.id,
                         'product_packaging': result.get('value', {}).get('product_packaging'),
