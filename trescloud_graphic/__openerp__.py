@@ -19,5 +19,5 @@ Este modulo agrega dos vistas mas graficas para pagos y cuentas analiticas
         'trescloud_voucher_views.xml',
     ],
     'installable' : True,
-    'auto_install': True,
+    'auto_install': False,
 }
